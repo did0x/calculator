@@ -1,6 +1,13 @@
-# calculator
+# Calculator
 
-This template should help get you started developing with Vue 3 in Vite.
+A simple calculator web application built with Vue 3 and Vite. It supports basic arithmetic operations in a clean, responsive interface.
+
+## Features
+
+- Addition, subtraction, multiplication, and division
+- Keyboard input support
+- Responsive UI for desktop and mobile
+- Built with Vue 3 + Vite
 
 ## Recommended IDE Setup
 

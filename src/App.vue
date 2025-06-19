@@ -7,28 +7,78 @@ const previousValue = ref(null);
 const operator = ref(null);
 const operatorClicked = ref(false);
 
+// Convert formatted display value to a raw numeric string using '.' as decimal for JS
+const toRawNumberString = (val) => {
+  // Remove thousands dots and replace decimal comma with dot
+  return val.replace(/\./g, '').replace(',', '.');
+};
+
+// Format a raw numeric string (with '.' decimal) into display format ('.' thousands, ',' decimal)
+// This is lenient and does NOT round—used while user is typing.
+const formatNumber = (val) => {
+  if (val === '' || isNaN(Number(val))) return val;
+  const [intPart, decPart] = val.split('.');
+  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return decPart !== undefined && decPart !== ''
+    ? `${formattedInt},${decPart}`
+    : formattedInt + (val.endsWith('.') ? ',' : ''); // preserve trailing comma if user typed decimal
+};
+
+// Format final calculation result to fit exactly 9 digits (digits before + after) using rounding.
+const formatResult = (num) => {
+  if (isNaN(num)) return 'Error';
+
+  const isNegative = num < 0;
+  const absNum = Math.abs(num);
+  const intPartStr = Math.floor(absNum).toString();
+  const digitsBefore = intPartStr.length;
+
+  // If integer part already exceeds 9 digits, truncate to first 9 digits (keep sign).
+  if (digitsBefore >= 9) {
+    const truncated = intPartStr.slice(0, 9);
+    const formattedInt = truncated.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (isNegative ? '-' : '') + formattedInt;
+  }
+
+  const allowedDecimals = 9 - digitsBefore;
+
+  // Build a string with many decimals, then truncate (not round) to allowed decimals
+  const preciseStr = absNum.toFixed(Math.max(allowedDecimals + 5, 6)); // extra precision
+  let [iPart, dPart] = preciseStr.split('.');
+  dPart = dPart ? dPart.slice(0, allowedDecimals) : '';
+  // Remove trailing zeros
+  dPart = dPart.replace(/0+$/, '');
+  const formattedInt = iPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const result = dPart && allowedDecimals > 0 ? `${formattedInt},${dPart}` : formattedInt;
+  return (isNegative ? '-' : '') + result;
+};
+
 /**
  * Handles number button clicks.
  * Appends or replaces the number on the display.
  * @param {string} number - The number that was clicked.
  */
 const handleNumber = (number) => {
+  let raw = toRawNumberString(display.value);
   if (display.value === '0' || operatorClicked.value) {
-    display.value = number;
+    raw = number;
     operatorClicked.value = false;
   } else {
-    // Prevent excessively long numbers
-    if (display.value.length >= 9) return;
-    display.value += number;
+    // Prevent exceeding 9 digits (excluding decimal point)
+    const digitsCount = raw.replace('.', '').length;
+    if (digitsCount >= 9) return;
+    raw += number;
   }
+  display.value = formatNumber(raw);
 };
 
 /**
  * Handles the decimal point button click.
  */
 const handleDecimal = () => {
-  if (!display.value.includes('.')) {
-    display.value += '.';
+  const raw = toRawNumberString(display.value);
+  if (!raw.includes('.')) {
+    display.value = formatNumber(raw + '.');
   }
 };
 
@@ -37,11 +87,10 @@ const handleDecimal = () => {
  * @param {string} op - The operator symbol.
  */
 const handleOperator = (op) => {
-  // If there's already an operator and a previous value, calculate first
   if (operator.value && previousValue.value !== null) {
     handleEquals();
   }
-  previousValue.value = display.value;
+  previousValue.value = toRawNumberString(display.value);
   operator.value = op;
   operatorClicked.value = true;
 };
@@ -65,7 +114,7 @@ const handleEquals = () => {
   }
 
   const prev = parseFloat(previousValue.value);
-  const current = parseFloat(display.value);
+  const current = parseFloat(toRawNumberString(display.value));
   let result = 0;
 
   switch (operator.value) {
@@ -79,26 +128,19 @@ const handleEquals = () => {
       result = prev * current;
       break;
     case '/':
-      // Handle division by zero
-      if (current === 0) {
-        result = 'Error';
-      } else {
-        result = prev / current;
-      }
+      result = current === 0 ? 'Error' : prev / current;
       break;
   }
 
-  // Format the result to fit the display
   if (result !== 'Error') {
-    display.value = String(result).slice(0, 10);
+    display.value = formatResult(result);
   } else {
     display.value = result;
   }
 
-  // Reset state for next calculation
   previousValue.value = null;
   operator.value = null;
-  operatorClicked.value = true; // Allow new number entry after equals
+  operatorClicked.value = true;
 };
 
 /**
@@ -112,7 +154,7 @@ const handleKeyDown = (e) => {
   if (key >= '0' && key <= '9') {
     handleNumber(key);
     e.preventDefault();
-  } else if (key === '.') {
+  } else if (key === '.' || key === ',') {
     handleDecimal();
     e.preventDefault();
   } else if (["+", "-", "*", "/"].includes(key)) {
@@ -178,7 +220,7 @@ onUnmounted(() => {
 
         <!-- Row 5 -->
         <button @click="handleNumber('0')" class="btn btn-dark-gray">0</button>
-        <button @click="handleDecimal" class="btn btn-dark-gray">.</button>
+        <button @click="handleDecimal" class="btn btn-dark-gray">,</button>
         <button @click="handleClear" class="btn btn-gray">AC</button>
       </div>
     </div>

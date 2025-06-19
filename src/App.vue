@@ -1,6 +1,6 @@
 <script setup>
 // Reactive state for calculator logic
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const display = ref('0');
 const previousValue = ref(null);
@@ -100,6 +100,44 @@ const handleEquals = () => {
   operator.value = null;
   operatorClicked.value = true; // Allow new number entry after equals
 };
+
+/**
+ * Handles keyboard input for the calculator.
+ * Maps key presses to their corresponding button handlers.
+ * @param {KeyboardEvent} e - The keyboard event.
+ */
+const handleKeyDown = (e) => {
+  const key = e.key;
+
+  if (key >= '0' && key <= '9') {
+    handleNumber(key);
+    e.preventDefault();
+  } else if (key === '.') {
+    handleDecimal();
+    e.preventDefault();
+  } else if (["+", "-", "*", "/"].includes(key)) {
+    handleOperator(key);
+    e.preventDefault();
+  } else if (key === 'x' || key === 'X') {
+    handleOperator('*');
+    e.preventDefault();
+  } else if (key === 'Enter' || key === '=') {
+    handleEquals();
+    e.preventDefault();
+  } else if (key === 'Escape' || key === 'Backspace' || key === 'c' || key === 'C') {
+    handleClear();
+    e.preventDefault();
+  }
+};
+
+// Register and clean up keyboard event listeners
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+});
 </script>
 
 <template>
